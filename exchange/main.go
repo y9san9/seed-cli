@@ -5,7 +5,7 @@ import (
     "crypto/rand"
     "crypto/ecdh"
     "encoding/base64"
-    "seed/io"
+    "seed/storage"
 )
 
 
@@ -60,8 +60,8 @@ func Run() {
         break
     }
 
-    io.SavePeer(name, sharedResult)
+    storage.SavePeer(name, sharedResult)
 
     fmt.Println("=========== Shared key generated ===========")
-    fmt.Println("Now you can encode/decode messages using 'seed session' command")
+    fmt.Printf("Now you can encode/decode messages using 'seed session %s' command\n", name)
 }

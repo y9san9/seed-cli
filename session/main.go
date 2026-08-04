@@ -2,62 +2,126 @@ package session
 
 import (
     "fmt"
+    "encoding/json"
+    "crypto/aes"
+    "crypto/cipher"
+    "seed/storage"
     "crypto/rand"
-    "crypto/ecdh"
     "encoding/base64"
+    "io"
+    "errors"
+    "bufio"
+    "os"
 )
 
-const keySize = 32
-const incorrectKeyMessage = "Paste the correct key, try again: "
+type message struct {
+    Version int `json:"version"`
+    Text string `json:"text"`
+}
 
-func Run() {
-    curve := ecdh.X25519()
+func Run(name string) {
+    scanner := bufio.NewScanner(os.Stdin)
+    fmt.Println("=========== Welcome to Seed Toolkit ===========")
 
-    fmt.Println("Welcome to Seed Toolkit!")
-    fmt.Println("Let's start an exchanging mechanism...")
-    fmt.Print("Peer name: ")
+    key, success := storage.LoadPeer(name)
+    if !success {
+        fmt.Printf("There is no session with name '%s'.\n", name)
+        return
+    }
 
-    var name string
-    fmt.Scanln(&name)
+    fmt.Printf("Session with %s has started.\n", name)
+    fmt.Println()
+    fmt.Println("TIPS:")
+    fmt.Println("• Messages will be decoded or encoded automatically.")
+    fmt.Println("• Use '\\' for newlines.")
+    // fmt.Println("• Text is copied to clipboard when encoded.")
+    // fmt.Println("• Leave message empty to paste from clipboard.")
+    fmt.Println()
+    fmt.Println("Paste text in the text field below:")
 
-    private, err := curve.GenerateKey(rand.Reader)
+    for{
+        fmt.Print("> ")
+        if !scanner.Scan() {
+            break
+        }
+        text := scanner.Text()
+
+        decrypted, err := decrypt(key, text)
+        if err == nil {
+            var message message
+            err := json.Unmarshal([]byte(decrypted), &message)
+            if err != nil {
+                fmt.Println("Message is poorely formatted.")
+                continue
+            }
+            fmt.Printf("%s: %s\n", name, message.Text)
+            continue
+        }
+
+        message := message {
+            Version: 0,
+            Text: text,
+        }
+        json, err := json.Marshal(message)
+        if err != nil {
+            fmt.Printf("Can't encode this message :(\n", err)
+            continue
+        }
+        encrypted, err := encrypt(key, string(json))
+        if err != nil {
+            fmt.Printf("Can't encode this message :(\n", err)
+            continue
+        }
+        fmt.Println("You:", encrypted)
+    }
+
+    fmt.Println("Session finished, bye :D")
+}
+
+func decrypt(
+    key []byte,
+    payload string,
+) (string, error) {
+    encrypted, err := base64.RawStdEncoding.DecodeString(payload)
     if err != nil {
-        panic(err)
+        return "", err
     }
-
-    public := base64.RawStdEncoding.EncodeToString(private.PublicKey().Bytes())
-
-    fmt.Printf("=========== Initializing %s's Peer ===========\n", name)
-    fmt.Printf("Step 1. Send this over untrusted channel: %s\n", public)
-    fmt.Printf("Step 2. Paste %s's response: ", name)
-
-    var sharedString string
-    for {
-        var peer string
-        fmt.Scanln(&peer)
-
-        peerBytes, err := base64.RawStdEncoding.DecodeString(peer)
-        if err != nil {
-            fmt.Print(incorrectKeyMessage)
-            continue
-        }
-
-        peerPublic, err := curve.NewPublicKey(peerBytes)
-        if err != nil {
-            fmt.Print(incorrectKeyMessage)
-            continue
-        }
-
-        shared, err := private.ECDH(peerPublic)
-        if err != nil {
-            fmt.Print(incorrectKeyMessage)
-            continue
-        }
-
-        sharedString = base64.RawStdEncoding.EncodeToString(shared)
-        break
+    block, err := aes.NewCipher(key)
+    if err != nil {
+        return "", err
     }
+    gcm, err := cipher.NewGCM(block)
+    if err != nil {
+        return "", err
+    }
+    if len(encrypted) <= gcm.NonceSize() {
+        return "", errors.New("Improperly formatted message")
+    }
+    data, err := gcm.Open(nil, encrypted[:gcm.NonceSize()], encrypted[gcm.NonceSize():], nil)
+    if err != nil {
+        return "", err
+    }
+    return string(data), nil
+}
 
-    fmt.Println("=========== Shared key generated ===========")
-    fmt.Println("Now you can encode/decode messages using 'seed session' command")
+func encrypt(
+    key []byte,
+    payload string,
+) (string, error) {
+    block, err := aes.NewCipher(key)
+    if err != nil {
+        return "", err
+    }
+    gcm, err := cipher.NewGCM(block)
+    if err != nil {
+        return "", err
+    }
+    nonce := make([]byte, gcm.NonceSize())
+    _, err = io.ReadFull(rand.Reader, nonce)
+    if err != nil {
+        return "", err
+    }
+    encrypted := gcm.Seal(nonce, nonce, []byte(payload), nil)
+    base64 := base64.RawStdEncoding.EncodeToString(encrypted)
+    return base64, nil
 }

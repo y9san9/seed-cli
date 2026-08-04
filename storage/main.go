@@ -1,4 +1,4 @@
-package io
+package storage
 
 import (
     "os"
@@ -52,15 +52,15 @@ func SavePeer(
     }
 }
 
-func LoadPeer(name string) []byte {
+func LoadPeer(name string) ([]byte, bool) {
     path := peerPath(name)
     data, err := os.ReadFile(path)
     if err != nil {
-        panic(err)
+        return nil, false
     }
     result, err := base64.RawStdEncoding.DecodeString(string(data))
     if err != nil {
         panic(err)
     }
-    return result
+    return result, true
 }
