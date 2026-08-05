@@ -30,25 +30,28 @@ func fileDecryptAction(
 
 	fmt.Println("Decrypting file...")
 
-	file, err := os.Open(text)
+	data, err := os.ReadFile(text)
 	if err != nil {
 		return false, err
 	}
-	defer file.Close()
-	reader := bufio.NewReader(file)
+	decrypted, err := decrypt(key, data)
+	if err != nil {
+		return false, err
+	}
+	reader := bufio.NewReader(bytes.NewReader(decrypted))
 
-	fileName, err := decryptFileName(reader, key)
+	fileName, err := readFileName(reader, key)
 	if err != nil {
 		return false, err
 	}
 	absolutePath := path.Join(path.Dir(text), fileName)
 
-	decrypted, err := decryptRest(reader, key)
+	content, err := io.ReadAll(reader)
 	if err != nil {
 		return false, err
 	}
 
-	err = os.WriteFile(absolutePath, decrypted, 0600)
+	err = os.WriteFile(absolutePath, content, 0600)
 	if err != nil {
 		return false, err
 	}
@@ -63,41 +66,27 @@ func fileDecryptAction(
 	return true, nil
 }
 
-func decryptFileName(
+func readFileName(
 	reader *bufio.Reader,
 	key []byte,
 ) (string, error) {
-	encrypted, err := reader.ReadBytes('\n')
+	data, err := reader.ReadString('\n')
 	if err != nil {
 		return "", err
 	}
-	encrypted = bytes.TrimRight(encrypted, "\n")
-	encrypted, err = base64.URLEncoding.DecodeString(string(encrypted))
-
-	decrypted, err := decrypt(key, encrypted)
+	data = strings.TrimRight(data, "\n")
+	decodedData, err := base64.URLEncoding.DecodeString(string(data))
 	if err != nil {
-		fmt.Printf("%w\n", err)
 		return "", err
 	}
+	string := string(decodedData)
 
-	fileNameString := string(decrypted)
-	originalExtension := path.Ext(fileNameString)
+	originalExtension := path.Ext(string)
 	if len(originalExtension) == 0 {
 		originalExtension = ".decrypted"
 	}
-	originalName := strings.TrimSuffix(fileNameString, originalExtension)
+	originalName := strings.TrimSuffix(string, originalExtension)
 	newName := originalName + ".seed" + originalExtension
 
 	return newName, nil
-}
-
-func decryptRest(
-	reader *bufio.Reader,
-	key []byte,
-) ([]byte, error) {
-	data, err := io.ReadAll(reader)
-	if err != nil {
-		return nil, err
-	}
-	return decrypt(key, data)
 }

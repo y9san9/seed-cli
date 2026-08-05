@@ -29,31 +29,28 @@ func fileEncryptAction(
 	fmt.Println("Encrypting file...")
 
 	hashedFileName := hashFileName(info.Name())
-	encryptedFileName, err := encryptFileName(key, info.Name())
-	if err != nil {
-		return false, err
-	}
+	base64FileName := base64.URLEncoding.EncodeToString([]byte(info.Name()))
 
 	data, err := os.ReadFile(text)
 	if err != nil {
 		return false, err
 	}
 
-	encrypted, err := encrypt(key, data)
+	var buffer bytes.Buffer
+	buffer.WriteString(base64FileName+"\n")
+	buffer.Write(data)
+
+	encrypted, err := encrypt(key, buffer.Bytes())
 	if err != nil {
 		return false, err
 	}
-
-	var buffer bytes.Buffer
-	buffer.WriteString(encryptedFileName+"\n")
-	buffer.Write(encrypted)
 
 	absolutePath := path.Join(
 		path.Dir(text),
 		hashedFileName+".seed",
 	)
 
-	if err := os.WriteFile(absolutePath, buffer.Bytes(), 0600); err != nil {
+	if err := os.WriteFile(absolutePath, encrypted, 0600); err != nil {
 		return false, err
 	}
 
@@ -71,13 +68,4 @@ func hashFileName(name string) string {
 	hash := sha256.Sum256([]byte(name))
 	first8 := hash[:8]
 	return hex.EncodeToString(first8)
-}
-
-func encryptFileName(key []byte, name string) (string, error) {
-	fileNameEncrypted, err := encrypt(key, []byte(name))
-	if err != nil {
-		return "", err
-	}
-	fileName := base64.URLEncoding.EncodeToString(fileNameEncrypted)
-	return fileName, nil
 }
