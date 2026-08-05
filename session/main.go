@@ -1,127 +1,103 @@
 package session
 
 import (
-    "fmt"
-    "encoding/json"
-    "crypto/aes"
-    "crypto/cipher"
-    "seed/storage"
-    "crypto/rand"
-    "encoding/base64"
-    "io"
-    "errors"
-    "bufio"
-    "os"
+	"bufio"
+	"fmt"
+	"github.com/atotto/clipboard"
+	"os"
+	"seed/storage"
+	"strings"
 )
 
 type message struct {
-    Version int `json:"version"`
-    Text string `json:"text"`
+	Version int    `json:"version"`
+	Text    string `json:"text"`
 }
 
 func Run(name string) {
-    scanner := bufio.NewScanner(os.Stdin)
-    fmt.Println("=========== Welcome to Seed Toolkit ===========")
+	scanner := bufio.NewScanner(os.Stdin)
+	fmt.Println("=========== Welcome to Seed Toolkit ===========")
 
-    key, success := storage.LoadPeer(name)
-    if !success {
-        fmt.Printf("There is no session with name '%s'.\n", name)
-        return
-    }
+	key, success := storage.LoadPeer(name)
+	if !success {
+		fmt.Printf("There is no session with name '%s'.\n", name)
+		return
+	}
 
-    fmt.Printf("Session with %s has started.\n", name)
-    fmt.Println()
-    fmt.Println("TIPS:")
-    fmt.Println("• Messages will be decoded or encoded automatically.")
-    fmt.Println("• Use '\\' for newlines.")
-    // fmt.Println("• Text is copied to clipboard when encoded.")
-    // fmt.Println("• Leave message empty to paste from clipboard.")
-    fmt.Println()
-    fmt.Println("Paste text in the text field below:")
+	fmt.Printf("Session with %s has started.\n", name)
+	fmt.Println()
+	fmt.Println("TIPS:")
+	fmt.Println("• Messages will be decoded or encoded automatically.")
+	fmt.Println("• Use '\\' for newlines.")
+	fmt.Println("• Enter file path to encrypt whole file.")
+	// fmt.Println("• Text is copied to clipboard when encoded.")
+	// fmt.Println("• Leave message empty to paste from clipboard.")
+	fmt.Println()
+	fmt.Println("Paste text in the text field below:")
 
-    for{
-        fmt.Print("> ")
-        if !scanner.Scan() {
-            break
-        }
-        text := scanner.Text()
+	for {
+		text := scanText(scanner)
+		if len(text) == 0 {
+			continue
+		}
 
-        decrypted, err := decrypt(key, text)
-        if err == nil {
-            var message message
-            err := json.Unmarshal([]byte(decrypted), &message)
-            if err != nil {
-                fmt.Println("Message is poorely formatted.")
-                continue
-            }
-            fmt.Printf("%s: %s\n", name, message.Text)
-            continue
-        }
+		ok, err := fileEncryptAction(key, text)
+		if err != nil {
+			fmt.Println("Message is poorely formatted.")
+			continue
+		}
+		if ok {
+			continue
+		}
+		ok, err = fileDecryptAction(name, key, text)
+		if err != nil {
+			fmt.Println("Message is poorely formatted.")
+			continue
+		}
+		if ok {
+			continue
+		}
+		ok, err = decryptAction(name, key, text)
+		if err != nil {
+			fmt.Println("Message is poorely formatted.")
+			continue
+		}
+		if ok {
+			continue
+		}
+		err = encryptAction(key, text)
+		if err != nil {
+			fmt.Printf("Can't encrypt this message :(\n", err)
+			continue
+		}
+	}
 
-        message := message {
-            Version: 0,
-            Text: text,
-        }
-        json, err := json.Marshal(message)
-        if err != nil {
-            fmt.Printf("Can't encode this message :(\n", err)
-            continue
-        }
-        encrypted, err := encrypt(key, string(json))
-        if err != nil {
-            fmt.Printf("Can't encode this message :(\n", err)
-            continue
-        }
-        fmt.Println("You:", encrypted)
-    }
-
-    fmt.Println("Session finished, bye :D")
+	fmt.Println("Session finished, bye :D")
 }
 
-func decrypt(
-    key []byte,
-    payload string,
-) (string, error) {
-    encrypted, err := base64.RawStdEncoding.DecodeString(payload)
-    if err != nil {
-        return "", err
-    }
-    block, err := aes.NewCipher(key)
-    if err != nil {
-        return "", err
-    }
-    gcm, err := cipher.NewGCM(block)
-    if err != nil {
-        return "", err
-    }
-    if len(encrypted) <= gcm.NonceSize() {
-        return "", errors.New("Improperly formatted message")
-    }
-    data, err := gcm.Open(nil, encrypted[:gcm.NonceSize()], encrypted[gcm.NonceSize():], nil)
-    if err != nil {
-        return "", err
-    }
-    return string(data), nil
-}
-
-func encrypt(
-    key []byte,
-    payload string,
-) (string, error) {
-    block, err := aes.NewCipher(key)
-    if err != nil {
-        return "", err
-    }
-    gcm, err := cipher.NewGCM(block)
-    if err != nil {
-        return "", err
-    }
-    nonce := make([]byte, gcm.NonceSize())
-    _, err = io.ReadFull(rand.Reader, nonce)
-    if err != nil {
-        return "", err
-    }
-    encrypted := gcm.Seal(nonce, nonce, []byte(payload), nil)
-    base64 := base64.RawStdEncoding.EncodeToString(encrypted)
-    return base64, nil
+func scanText(scanner *bufio.Scanner) string {
+	var text string
+	for {
+		fmt.Print("> ")
+		if !scanner.Scan() {
+			break
+		}
+		text += strings.TrimSpace(scanner.Text())
+		if !strings.HasSuffix(text, "\\") {
+			break
+		}
+		text = strings.TrimSuffix(text, "\\")
+		text += "\n"
+	}
+	text = strings.TrimSpace(text)
+	if len(text) == 0 {
+		var err error
+		text, err = clipboard.ReadAll()
+		if err != nil {
+			fmt.Println("Cannot read clipboard!")
+		} else if len(text) > 0 {
+			fmt.Printf("Clipboard read (%d bytes)\n", len([]byte(text)))
+		}
+	}
+	return strings.TrimSpace(text)
 }

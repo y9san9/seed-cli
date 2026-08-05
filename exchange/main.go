@@ -1,67 +1,75 @@
 package exchange
 
 import (
-    "fmt"
-    "crypto/rand"
-    "crypto/ecdh"
-    "encoding/base64"
-    "seed/storage"
+	"crypto/ecdh"
+	"crypto/rand"
+	"encoding/base64"
+	"fmt"
+	"seed/storage"
 )
-
 
 const keySize = 32
 const incorrectKeyMessage = "Paste the correct key, try again: "
 
 func Run() {
-    curve := ecdh.X25519()
+	curve := ecdh.X25519()
 
-    fmt.Println("Welcome to Seed Toolkit!")
-    fmt.Println("Let's start an exchanging mechanism...")
-    fmt.Print("Peer name: ")
+	fmt.Println("Welcome to Seed Toolkit!")
+	fmt.Println("Let's start an exchanging mechanism...")
+	fmt.Print("Peer name: ")
 
-    var name string
-    fmt.Scanln(&name)
+	var name string
+	for {
+		fmt.Scanln(&name)
 
-    private, err := curve.GenerateKey(rand.Reader)
-    if err != nil {
-        panic(err)
-    }
+		if storage.HasPeer(name) {
+			fmt.Printf("Peer with name %s already exists\n", name)
+			continue
+		}
 
-    public := base64.RawStdEncoding.EncodeToString(private.PublicKey().Bytes())
+		break
+	}
 
-    fmt.Printf("=========== Initializing %s's Peer ===========\n", name)
-    fmt.Printf("Step 1. Send this over untrusted channel: %s\n", public)
-    fmt.Printf("Step 2. Paste %s's response: ", name)
+	private, err := curve.GenerateKey(rand.Reader)
+	if err != nil {
+		panic(err)
+	}
 
-    var sharedResult []byte
-    for {
-        var peer string
-        fmt.Scanln(&peer)
+	public := base64.URLEncoding.EncodeToString(private.PublicKey().Bytes())
 
-        peerBytes, err := base64.RawStdEncoding.DecodeString(peer)
-        if err != nil {
-            fmt.Print(incorrectKeyMessage)
-            continue
-        }
+	fmt.Printf("=========== Initializing %s's Peer ===========\n", name)
+	fmt.Printf("Step 1. Send this over untrusted channel: %s\n", public)
+	fmt.Printf("Step 2. Paste %s's response: ", name)
 
-        peerPublic, err := curve.NewPublicKey(peerBytes)
-        if err != nil {
-            fmt.Print(incorrectKeyMessage)
-            continue
-        }
+	var sharedResult []byte
+	for {
+		var peer string
+		fmt.Scanln(&peer)
 
-        shared, err := private.ECDH(peerPublic)
-        if err != nil {
-            fmt.Print(incorrectKeyMessage)
-            continue
-        }
+		peerBytes, err := base64.URLEncoding.DecodeString(peer)
+		if err != nil {
+			fmt.Print(incorrectKeyMessage)
+			continue
+		}
 
-        sharedResult = shared
-        break
-    }
+		peerPublic, err := curve.NewPublicKey(peerBytes)
+		if err != nil {
+			fmt.Print(incorrectKeyMessage)
+			continue
+		}
 
-    storage.SavePeer(name, sharedResult)
+		shared, err := private.ECDH(peerPublic)
+		if err != nil {
+			fmt.Print(incorrectKeyMessage)
+			continue
+		}
 
-    fmt.Println("=========== Shared key generated ===========")
-    fmt.Printf("Now you can encode/decode messages using 'seed session %s' command\n", name)
+		sharedResult = shared
+		break
+	}
+
+	storage.SavePeer(name, sharedResult)
+
+	fmt.Println("=========== Shared key generated ===========")
+	fmt.Printf("Now you can encode/decode messages using 'seed session %s' command\n", name)
 }
