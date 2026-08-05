@@ -1,11 +1,14 @@
 package session
 
 import (
+	"encoding/hex"
 	"encoding/base64"
 	"fmt"
 	"github.com/atotto/clipboard"
 	"os"
 	"path"
+	"crypto/sha256"
+	"bytes"
 )
 
 func fileEncryptAction(
@@ -25,8 +28,8 @@ func fileEncryptAction(
 
 	fmt.Println("Encrypting file...")
 
-	fileNameEncrypted, err := encrypt(key, []byte(info.Name()))
-	fileName := base64.URLEncoding.EncodeToString(fileNameEncrypted)
+	hashedFileName := hashFileName(info.Name())
+	encryptedFileName, err := encryptFileName(key, info.Name())
 	if err != nil {
 		return false, err
 	}
@@ -41,13 +44,16 @@ func fileEncryptAction(
 		return false, err
 	}
 
-	// File in the same directory, but mangled
+	var buffer bytes.Buffer
+	buffer.WriteString(encryptedFileName+"\n")
+	buffer.Write(encrypted)
+
 	absolutePath := path.Join(
 		path.Dir(text),
-		fileName+".seed",
+		hashedFileName+".seed",
 	)
 
-	if err := os.WriteFile(absolutePath, encrypted, 0600); err != nil {
+	if err := os.WriteFile(absolutePath, buffer.Bytes(), 0600); err != nil {
 		return false, err
 	}
 
@@ -59,4 +65,19 @@ func fileEncryptAction(
 	}
 
 	return true, nil
+}
+
+func hashFileName(name string) string {
+	hash := sha256.Sum256([]byte(name))
+	first8 := hash[:8]
+	return hex.EncodeToString(first8)
+}
+
+func encryptFileName(key []byte, name string) (string, error) {
+	fileNameEncrypted, err := encrypt(key, []byte(name))
+	if err != nil {
+		return "", err
+	}
+	fileName := base64.URLEncoding.EncodeToString(fileNameEncrypted)
+	return fileName, nil
 }

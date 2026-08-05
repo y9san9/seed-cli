@@ -2,6 +2,9 @@ package session
 
 import (
 	"encoding/base64"
+	"io"
+	"bytes"
+	"bufio"
 	"fmt"
 	"github.com/atotto/clipboard"
 	"os"
@@ -26,35 +29,21 @@ func fileDecryptAction(
 	}
 
 	fmt.Println("Decrypting file...")
-	fileName := strings.TrimSuffix(info.Name(), ".seed")
 
-	fileNameEncrypted, err := base64.URLEncoding.DecodeString(fileName)
+	file, err := os.Open(text)
 	if err != nil {
 		return false, err
 	}
+	defer file.Close()
+	reader := bufio.NewReader(file)
 
-	fileNameDecrypted, err := decrypt(key, fileNameEncrypted)
+	fileName, err := decryptFileName(reader, key)
 	if err != nil {
 		return false, err
 	}
-	fileNameString := string(fileNameDecrypted)
+	absolutePath := path.Join(path.Dir(text), fileName)
 
-	originalExtension := path.Ext(fileNameString)
-	if len(originalExtension) == 0 {
-		originalExtension = ".decrypted"
-	}
-	originalName := strings.TrimSuffix(fileNameString, originalExtension)
-	newName := originalName + ".seed" + originalExtension
-	absolutePath := path.Join(
-		path.Dir(text),
-		newName,
-	)
-
-	data, err := os.ReadFile(text)
-	if err != nil {
-		return false, err
-	}
-	decrypted, err := decrypt(key, data)
+	decrypted, err := decryptRest(reader, key)
 	if err != nil {
 		return false, err
 	}
@@ -72,4 +61,43 @@ func fileDecryptAction(
 	}
 
 	return true, nil
+}
+
+func decryptFileName(
+	reader *bufio.Reader,
+	key []byte,
+) (string, error) {
+	encrypted, err := reader.ReadBytes('\n')
+	if err != nil {
+		return "", err
+	}
+	encrypted = bytes.TrimRight(encrypted, "\n")
+	encrypted, err = base64.URLEncoding.DecodeString(string(encrypted))
+
+	decrypted, err := decrypt(key, encrypted)
+	if err != nil {
+		fmt.Printf("%w\n", err)
+		return "", err
+	}
+
+	fileNameString := string(decrypted)
+	originalExtension := path.Ext(fileNameString)
+	if len(originalExtension) == 0 {
+		originalExtension = ".decrypted"
+	}
+	originalName := strings.TrimSuffix(fileNameString, originalExtension)
+	newName := originalName + ".seed" + originalExtension
+
+	return newName, nil
+}
+
+func decryptRest(
+	reader *bufio.Reader,
+	key []byte,
+) ([]byte, error) {
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, err
+	}
+	return decrypt(key, data)
 }
