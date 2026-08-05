@@ -29,9 +29,9 @@ func Run(name string) {
 	fmt.Println("TIPS:")
 	fmt.Println("• Messages will be decoded or encoded automatically.")
 	fmt.Println("• Use '\\' for newlines.")
-	fmt.Println("• Enter file path to encrypt whole file.")
-	// fmt.Println("• Text is copied to clipboard when encoded.")
-	// fmt.Println("• Leave message empty to paste from clipboard.")
+	fmt.Println("• Enter file path to encrypt/decrypt whole file.")
+	fmt.Println("• Text is copied to clipboard when encoded.")
+	fmt.Println("• Leave message empty to paste from clipboard.")
 	fmt.Println()
 	fmt.Println("Paste text in the text field below:")
 
