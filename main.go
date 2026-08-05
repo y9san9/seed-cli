@@ -8,10 +8,22 @@ import (
 )
 
 func main() {
+	fmt.Println("=========== Welcome to Seed Toolkit ===========")
+
 	if len(os.Args) < 2 {
-		// TODO: proper help
 		fmt.Println("Usage: seed <command>")
-		os.Exit(1)
+		fmt.Println()
+		fmt.Println("Available commands:")
+		fmt.Println("• seed exchange       -  Start exchange process")
+		fmt.Println("• seed session <peer> -  Start session with saved peer")
+		fmt.Println()
+		fmt.Println("Seed is offline set of utilities that allows you to exchange sensitive data over untrusted channels.")
+		fmt.Println("It is designed to be the last emergency channel that is used to find more sustainable communication channels.")
+		fmt.Println("Hence, no app, no servers, just CLI for mathematical algorithms.")
+		fmt.Println()
+		fmt.Println("Settings directory: ~/.seed")
+		fmt.Println("Upstream: https://github.com/y9san9/seed-cli")
+		os.Exit(0)
 	}
 	switch os.Args[1] {
 	case "exchange":

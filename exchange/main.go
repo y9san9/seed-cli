@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"seed/storage"
+	"github.com/atotto/clipboard"
 )
 
 const keySize = 32
@@ -14,7 +15,6 @@ const incorrectKeyMessage = "Paste the correct key, try again: "
 func Run() {
 	curve := ecdh.X25519()
 
-	fmt.Println("Welcome to Seed Toolkit!")
 	fmt.Println("Let's start an exchanging mechanism...")
 	fmt.Print("Peer name: ")
 
@@ -38,7 +38,16 @@ func Run() {
 	public := base64.URLEncoding.EncodeToString(private.PublicKey().Bytes())
 
 	fmt.Printf("=========== Initializing %s's Peer ===========\n", name)
-	fmt.Printf("Step 1. Send this over untrusted channel: %s\n", public)
+
+	fmt.Printf("Step 1. Send this over untrusted channel: %s", public)
+
+	err = clipboard.WriteAll(public)
+	if err == nil {
+		fmt.Println(" (copied)")
+	} else {
+		fmt.Println()
+	}
+
 	fmt.Printf("Step 2. Paste %s's response: ", name)
 
 	var sharedResult []byte

@@ -16,11 +16,10 @@ type message struct {
 
 func Run(name string) {
 	scanner := bufio.NewScanner(os.Stdin)
-	fmt.Println("=========== Welcome to Seed Toolkit ===========")
-
 	key, success := storage.LoadPeer(name)
 	if !success {
 		fmt.Printf("There is no session with name '%s'.\n", name)
+		fmt.Println("To check available peers, visit ~/.seed/peers")
 		return
 	}
 
@@ -32,16 +31,27 @@ func Run(name string) {
 	fmt.Println("• Enter file path to encrypt/decrypt whole file.")
 	fmt.Println("• Text is copied to clipboard when encoded.")
 	fmt.Println("• Leave message empty to paste from clipboard.")
+	fmt.Println("• Use :e to edit prompt with a proper editor.")
 	fmt.Println()
 	fmt.Println("Paste text in the text field below:")
 
 	for {
 		text := scanText(scanner)
+
+		newText, ok, err := editorAction(text)
+		if err != nil {
+			fmt.Println("Couldn't use editor :(")
+			continue
+		}
+		if ok {
+			text = newText
+		}
+
 		if len(text) == 0 {
 			continue
 		}
 
-		ok, err := fileEncryptAction(key, text)
+		ok, err = fileEncryptAction(key, text)
 		if err != nil {
 			fmt.Println("Message is poorely formatted.")
 			continue
