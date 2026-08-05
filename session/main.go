@@ -14,11 +14,18 @@ type message struct {
 	Text    string `json:"text"`
 }
 
-func Run(name string) {
+func Run(args []string) {
+	if len(args) < 3 {
+		fmt.Println("Usage: seed session <peer>")
+		fmt.Println("To check available peers, visit ~/.seed/peers")
+		return
+	}
+	name := args[2]
+
 	scanner := bufio.NewScanner(os.Stdin)
 	key, success := storage.LoadPeer(name)
 	if !success {
-		fmt.Printf("There is no session with name '%s'.\n", name)
+		fmt.Printf("There is no peer with name '%s'.\n", name)
 		fmt.Println("To check available peers, visit ~/.seed/peers")
 		return
 	}

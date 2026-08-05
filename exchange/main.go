@@ -23,7 +23,7 @@ func Run() {
 		fmt.Scanln(&name)
 
 		if storage.HasPeer(name) {
-			fmt.Printf("Peer with name %s already exists\n", name)
+			fmt.Printf("Peer with name %s already exists, try again: ", name)
 			continue
 		}
 
