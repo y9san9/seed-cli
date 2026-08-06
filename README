@@ -1,0 +1,16 @@
+=========== Welcome to Seed Toolkit ===========
+Usage: seed <command>
+
+Available commands:
+• seed exchange       -  Start exchange process
+• seed session <peer> -  Start session with saved peer
+• seed export <peer>  -  Export saved peer to other device safely
+• seed import         -  Import peer from other device safely
+• seed generate       -  Generate peer locally
+
+Seed is offline set of utilities that allows you to exchange sensitive data over untrusted channels. It is designed to be the last emergency channel that is used to find more sustainable communication channels.
+
+Hence, no app, no servers, just CLI for mathematical algorithms.
+
+Settings directory: ~/.seed
+Upstream: https://github.com/y9san9/seed-cli
