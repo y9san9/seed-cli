@@ -2,25 +2,38 @@ package session
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"github.com/atotto/clipboard"
+	"github.com/fxamacker/cbor/v2"
 )
 
 func encryptAction(
-	key []byte,
-	text string,
+	input *inputState,
 ) error {
+	var payload []byte
+	var err error
+
+	if input.burnKey != nil {
+		payload, err = encrypt(input.burnKey, []byte(input.text))
+		if err != nil {
+			return err
+		}
+	} else {
+		payload = []byte(input.text)
+	}
+
 	message := message{
 		Version: 0,
-		Text:    text,
+		Payload: payload,
+		Burn:    input.burnKey != nil,
 	}
-	json, err := json.Marshal(message)
+
+	cbor, err := cbor.Marshal(message)
 	if err != nil {
 		return err
 	}
 
-	encrypted, err := encrypt(key, json)
+	encrypted, err := encrypt(input.key, cbor)
 	if err != nil {
 		return err
 	}

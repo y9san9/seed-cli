@@ -1,20 +1,21 @@
 package session
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
-	"encoding/base64"
 	"fmt"
 	"github.com/atotto/clipboard"
+	"github.com/fxamacker/cbor/v2"
 	"os"
 	"path"
-	"crypto/sha256"
-	"bytes"
 )
 
-func fileEncryptAction(
-	key []byte,
-	text string,
-) (bool, error) {
+func fileEncryptAction(input *inputState) (bool, error) {
+	text := input.text
+	key := input.key
+
 	if path.Ext(text) == ".seed" {
 		return false, nil
 	}
@@ -29,16 +30,57 @@ func fileEncryptAction(
 	fmt.Println("Encrypting file...")
 
 	hashedFileName := hashFileName(info.Name())
-	base64FileName := base64.URLEncoding.EncodeToString([]byte(info.Name()))
 
 	data, err := os.ReadFile(text)
 	if err != nil {
 		return false, err
 	}
 
-	var buffer bytes.Buffer
-	buffer.WriteString(base64FileName+"\n")
-	buffer.Write(data)
+	metadata := fileMetadata{
+		Type: "encrypted",
+		Name: info.Name(),
+	}
+	metadataBytes, err := cbor.Marshal(metadata)
+	if err != nil {
+		return false, err
+	}
+
+	buffer := new(bytes.Buffer)
+	length := int32(len(metadataBytes))
+	if err := binary.Write(buffer, binary.LittleEndian, length); err != nil {
+		return false, err
+	}
+	if _, err := buffer.Write(metadataBytes); err != nil {
+		return false, err
+	}
+	if _, err := buffer.Write(data); err != nil {
+		return false, err
+	}
+
+	if input.burnKey != nil {
+		encrypted, err := encrypt(input.burnKey, buffer.Bytes())
+		if err != nil {
+			return false, err
+		}
+		metadata := burnFileMetadata{
+			Type: "burn",
+		}
+		metadataBytes, err := cbor.Marshal(metadata)
+		if err != nil {
+			return false, err
+		}
+		buffer = new(bytes.Buffer)
+		length := int32(len(metadataBytes))
+		if err := binary.Write(buffer, binary.LittleEndian, length); err != nil {
+			return false, err
+		}
+		if _, err := buffer.Write(metadataBytes); err != nil {
+			return false, err
+		}
+		if _, err := buffer.Write(encrypted); err != nil {
+			return false, err
+		}
+	}
 
 	encrypted, err := encrypt(key, buffer.Bytes())
 	if err != nil {

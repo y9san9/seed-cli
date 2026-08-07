@@ -5,8 +5,8 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"seed/storage"
 	"github.com/atotto/clipboard"
+	"seed/storage"
 )
 
 const keySize = 32

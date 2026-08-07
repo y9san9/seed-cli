@@ -3,16 +3,9 @@ package session
 import (
 	"bufio"
 	"fmt"
-	"github.com/atotto/clipboard"
 	"os"
 	"seed/storage"
-	"strings"
 )
-
-type message struct {
-	Version int    `json:"version"`
-	Text    string `json:"text"`
-}
 
 func Run(args []string) {
 	if len(args) < 3 {
@@ -20,17 +13,19 @@ func Run(args []string) {
 		fmt.Println("To check available peers, visit ~/.seed/peers")
 		return
 	}
-	name := args[2]
+	var input inputState
+	input.peer = args[2]
 
 	scanner := bufio.NewScanner(os.Stdin)
-	key, success := storage.LoadPeer(name)
+	key, success := storage.LoadPeer(input.peer)
 	if !success {
-		fmt.Printf("There is no peer with name '%s'.\n", name)
+		fmt.Printf("There is no peer with name '%s'.\n", input.peer)
 		fmt.Println("To check available peers, visit ~/.seed/peers")
 		return
 	}
+	input.key = key
 
-	fmt.Printf("Session with %s has started.\n", name)
+	fmt.Printf("Session with %s has started.\n", input.peer)
 	fmt.Println()
 	fmt.Println("TIPS:")
 	fmt.Println("• Messages will be decoded or encoded automatically.")
@@ -39,26 +34,49 @@ func Run(args []string) {
 	fmt.Println("• Text is copied to clipboard when encoded.")
 	fmt.Println("• Leave message empty to paste from clipboard.")
 	fmt.Println("• Use :e to edit prompt with a proper editor.")
+	fmt.Println("• Use :burn to create a self-burning session.")
 	fmt.Println()
 	fmt.Println("Paste text in the text field below:")
 
 	for {
-		text := scanText(scanner)
+		input.text = scanText(input.burnKey != nil, scanner)
 
-		newText, ok, err := editorAction(text)
+		ok, err := burnRequestAction(&input)
+		if err != nil {
+			fmt.Printf("Couldn't start burn session. %+w\n", err)
+			continue
+		}
+		if ok {
+			continue
+		}
+
+		err = editorAction(&input)
 		if err != nil {
 			fmt.Println("Couldn't use editor :(")
 			continue
 		}
-		if ok {
-			text = newText
-		}
 
-		if len(text) == 0 {
+		if len(input.text) == 0 {
 			continue
 		}
 
-		ok, err = fileEncryptAction(key, text)
+		ok, err = fileEncryptAction(&input)
+		if err != nil {
+			fmt.Printf("Message is poorely formatted. %#v\n", err)
+			continue
+		}
+		if ok {
+			continue
+		}
+		ok, err = fileDecryptAction(&input)
+		if err != nil {
+			fmt.Printf("Message is poorely formatted. %+v\n", err)
+			continue
+		}
+		if ok {
+			continue
+		}
+		ok, err = decryptAction(&input)
 		if err != nil {
 			fmt.Println("Message is poorely formatted.")
 			continue
@@ -66,55 +84,12 @@ func Run(args []string) {
 		if ok {
 			continue
 		}
-		ok, err = fileDecryptAction(name, key, text)
+		err = encryptAction(&input)
 		if err != nil {
-			fmt.Println("Message is poorely formatted.")
-			continue
-		}
-		if ok {
-			continue
-		}
-		ok, err = decryptAction(name, key, text)
-		if err != nil {
-			fmt.Println("Message is poorely formatted.")
-			continue
-		}
-		if ok {
-			continue
-		}
-		err = encryptAction(key, text)
-		if err != nil {
-			fmt.Printf("Can't encrypt this message :(\n", err)
+			fmt.Printf("Can't encrypt this message :( %+w\n", err)
 			continue
 		}
 	}
 
 	fmt.Println("Session finished, bye :D")
-}
-
-func scanText(scanner *bufio.Scanner) string {
-	var text string
-	for {
-		fmt.Print("> ")
-		if !scanner.Scan() {
-			break
-		}
-		text += strings.TrimSpace(scanner.Text())
-		if !strings.HasSuffix(text, "\\") {
-			break
-		}
-		text = strings.TrimSuffix(text, "\\")
-		text += "\n"
-	}
-	text = strings.TrimSpace(text)
-	if len(text) == 0 {
-		var err error
-		text, err = clipboard.ReadAll()
-		if err != nil {
-			fmt.Println("Cannot read clipboard!")
-		} else if len(text) > 0 {
-			fmt.Printf("Clipboard read (%d bytes)\n", len([]byte(text)))
-		}
-	}
-	return strings.TrimSpace(text)
 }

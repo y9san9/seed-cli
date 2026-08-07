@@ -4,18 +4,18 @@ import (
 	"crypto/ecdh"
 	"crypto/rand"
 	"encoding/base64"
-    "encoding/json"
+	"encoding/json"
 	"fmt"
-    "seed/storage"
 	"github.com/atotto/clipboard"
+	"seed/storage"
 )
 
 const incorrectKeyMessage = "Paste the correct key, try again: "
 
 type export struct {
-    PublicKey string `json:"public_key"`
-    Name      string `json:"name"`
-    Payload   string `json:"payload"`
+	PublicKey string `json:"public_key"`
+	Name      string `json:"name"`
+	Payload   string `json:"payload"`
 }
 
 func Run(args []string) {
@@ -28,23 +28,23 @@ func Run(args []string) {
 	}
 
 	name := args[2]
-    staticSecret, success := storage.LoadPeer(name)
-    if !success {
+	staticSecret, success := storage.LoadPeer(name)
+	if !success {
 		fmt.Printf("There is no peer with name '%s'.\n", name)
 		fmt.Println("To check available peers, visit ~/.seed/peers")
 		return
-    }
+	}
 	privateKey, err := curve.GenerateKey(rand.Reader)
 	if err != nil {
 		panic(err)
 	}
 
-    fmt.Printf("Sharing key for peer %s.\n", name)
-    fmt.Println("The actual shared key WILL NEVER be exposed.")
-    fmt.Println("You can share single-time key in untrusted environments.")
-    fmt.Println("In order to achieve that, we first need a single-time key from your target machine.")
-    fmt.Println("ON TARGET MACHINE, type 'seed import' and paste it below.")
-    fmt.Print("Step 1. Single-time key: ")
+	fmt.Printf("Sharing key for peer %s.\n", name)
+	fmt.Println("The actual shared key WILL NEVER be exposed.")
+	fmt.Println("You can share single-time key in untrusted environments.")
+	fmt.Println("In order to achieve that, we first need a single-time key from your target machine.")
+	fmt.Println("ON TARGET MACHINE, type 'seed import' and paste it below.")
+	fmt.Print("Step 1. Single-time key: ")
 
 	var singleTimeSecret []byte
 	for {
@@ -72,30 +72,30 @@ func Run(args []string) {
 		break
 	}
 
-    encryptedPayload, err := encrypt(singleTimeSecret, staticSecret)
-    if err != nil {
-        panic(err)
-    }
+	encryptedPayload, err := encrypt(singleTimeSecret, staticSecret)
+	if err != nil {
+		panic(err)
+	}
 
-    encryptedName, err := encrypt(singleTimeSecret, []byte(name))
-    if err != nil {
-        panic(err)
-    }
+	encryptedName, err := encrypt(singleTimeSecret, []byte(name))
+	if err != nil {
+		panic(err)
+	}
 
-    json, err := json.Marshal(export{
-        PublicKey: base64.URLEncoding.EncodeToString(
-            privateKey.PublicKey().Bytes(),
-        ),
-        Name: base64.URLEncoding.EncodeToString(encryptedName),
-        Payload: base64.URLEncoding.EncodeToString(encryptedPayload),
-    })
-    if err != nil {
-        panic(err)
-    }
+	json, err := json.Marshal(export{
+		PublicKey: base64.URLEncoding.EncodeToString(
+			privateKey.PublicKey().Bytes(),
+		),
+		Name:    base64.URLEncoding.EncodeToString(encryptedName),
+		Payload: base64.URLEncoding.EncodeToString(encryptedPayload),
+	})
+	if err != nil {
+		panic(err)
+	}
 
-    stringPayload := base64.URLEncoding.EncodeToString([]byte(json))
+	stringPayload := base64.URLEncoding.EncodeToString([]byte(json))
 
-    fmt.Print("Step 2. Import secured key: ", stringPayload)
+	fmt.Print("Step 2. Import secured key: ", stringPayload)
 
 	err = clipboard.WriteAll(stringPayload)
 	if err == nil {
@@ -104,5 +104,5 @@ func Run(args []string) {
 		fmt.Println()
 	}
 
-    fmt.Println("Next steps are completed on the other device.")
+	fmt.Println("Next steps are completed on the other device.")
 }

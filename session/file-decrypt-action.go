@@ -1,22 +1,23 @@
 package session
 
 import (
-	"encoding/base64"
-	"io"
-	"bytes"
 	"bufio"
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"github.com/atotto/clipboard"
+	"github.com/fxamacker/cbor/v2"
+	"io"
 	"os"
 	"path"
 	"strings"
 )
 
 func fileDecryptAction(
-	name string,
-	key []byte,
-	text string,
+	input *inputState,
 ) (bool, error) {
+	text := input.text
+	key := input.key
 	if path.Ext(text) != ".seed" {
 		return false, nil
 	}
@@ -39,12 +40,32 @@ func fileDecryptAction(
 		return false, err
 	}
 	reader := bufio.NewReader(bytes.NewReader(decrypted))
-
-	fileName, err := readFileName(reader, key)
+	metadataBytes, err := readMetadataBytes(reader)
 	if err != nil {
 		return false, err
 	}
-	absolutePath := path.Join(path.Dir(text), fileName)
+
+	// set metadataBytes and reader
+	reader, metadataBytes, burn, err := readBurnFile(reader, metadataBytes, input.burnKey)
+	if err != nil {
+		return false, err
+	}
+	if burn && input.burnKey == nil {
+		fmt.Println("File was sent during self-burning session. Keys were destroyed :D")
+		return true, nil
+	}
+	if !burn && input.burnKey != nil {
+		fmt.Printf("%s left self-burning session, leaving as well...\n", input.peer)
+		input.burnKey = nil
+	}
+
+	var metadata fileMetadata
+	err = cbor.Unmarshal(metadataBytes, &metadata)
+	if err != nil {
+		return false, err
+	}
+	filename := transformFilename(metadata.Name)
+	absolutePath := path.Join(path.Dir(text), filename)
 
 	content, err := io.ReadAll(reader)
 	if err != nil {
@@ -58,35 +79,66 @@ func fileDecryptAction(
 
 	err = clipboard.WriteAll(absolutePath)
 	if err == nil {
-		fmt.Println(name+":", absolutePath, "(copied)")
+		fmt.Println(input.peer+":", absolutePath, "(copied)")
 	} else {
-		fmt.Println(name+":", absolutePath)
+		fmt.Println(input.peer+":", absolutePath)
 	}
 
 	return true, nil
 }
 
-func readFileName(
+func readBurnFile(
 	reader *bufio.Reader,
-	key []byte,
-) (string, error) {
-	data, err := reader.ReadString('\n')
-	if err != nil {
-		return "", err
+	metadataBytes []byte,
+	burnKey []byte,
+) (*bufio.Reader, []byte, bool, error) {
+	var burn burnFileMetadata
+	err := cbor.Unmarshal(metadataBytes, &burn)
+	if err != nil || burn.Type != "burn" {
+		return reader, metadataBytes, false, nil
 	}
-	data = strings.TrimRight(data, "\n")
-	decodedData, err := base64.URLEncoding.DecodeString(string(data))
-	if err != nil {
-		return "", err
+	if burnKey == nil {
+		return reader, metadataBytes, true, nil
 	}
-	string := string(decodedData)
 
-	originalExtension := path.Ext(string)
+	content, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, nil, false, err
+	}
+
+	decrypted, err := decrypt(burnKey, content)
+	if err != nil {
+		return nil, nil, false, err
+	}
+
+	resultReader := bufio.NewReader(bytes.NewReader(decrypted))
+	resultMetadataBytes, err := readMetadataBytes(resultReader)
+	if err != nil {
+		return nil, nil, false, err
+	}
+
+	return resultReader, resultMetadataBytes, true, nil
+}
+
+func readMetadataBytes(reader *bufio.Reader) (metadataBytes []byte, err error) {
+	var length int32
+	err = binary.Read(reader, binary.LittleEndian, &length)
+	if err != nil {
+		return
+	}
+	metadataBytes = make([]byte, length)
+	read, err := reader.Read(metadataBytes)
+	if err != nil || int32(read) != length {
+		return
+	}
+	return
+}
+
+func transformFilename(name string) string {
+	originalExtension := path.Ext(name)
 	if len(originalExtension) == 0 {
 		originalExtension = ".decrypted"
 	}
-	originalName := strings.TrimSuffix(string, originalExtension)
-	newName := originalName + ".seed" + originalExtension
-
-	return newName, nil
+	originalName := strings.TrimSuffix(name, originalExtension)
+	return originalName + ".seed" + originalExtension
 }
