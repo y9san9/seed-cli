@@ -44,6 +44,7 @@ func RunInterruptible(
 	defer func() {
 		for _, path := range input.burn.deletePaths {
 			fmt.Println("Burning:", path)
+			_ = writeGarbage(path)
 			_ = os.Remove(path)
 		}
 	}()
@@ -80,6 +81,7 @@ func RunInterruptible(
 		var err error
 		input.text, err = scanText(ctx, input.burn.key != nil, scanner)
 		if err != nil {
+			fmt.Println()
 			return
 		}
 
