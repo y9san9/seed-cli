@@ -6,7 +6,9 @@ import (
 	"encoding/base64"
 	"fmt"
 	"github.com/atotto/clipboard"
+	"seed/signature"
 	"seed/storage"
+	"time"
 )
 
 const keySize = 32
@@ -37,6 +39,7 @@ func Run() {
 
 	public := base64.URLEncoding.EncodeToString(private.PublicKey().Bytes())
 
+	fmt.Println()
 	fmt.Printf("=========== Initializing %s's Peer ===========\n", name)
 
 	fmt.Printf("Step 1. Send this over untrusted channel: %s", public)
@@ -47,6 +50,8 @@ func Run() {
 	} else {
 		fmt.Println()
 	}
+
+	time.Sleep(5 * time.Second)
 
 	fmt.Printf("Step 2. Paste %s's response: ", name)
 
@@ -79,6 +84,14 @@ func Run() {
 
 	storage.SavePeer(name, sharedResult)
 
+	fmt.Println()
 	fmt.Println("=========== Shared key generated ===========")
+	fmt.Println("PUBLIC SIGNATURE:", signature.DisplayString(sharedResult), "(SHA-256)")
+	fmt.Println()
+	time.Sleep(2 * time.Second)
+	fmt.Println("If both parties see the same text here, it is GUARANTEED that no one can read messages other than you.")
+	fmt.Println("If keys were MODIFIED by someone in the middle, signature will differ.")
+	fmt.Println("Suggested method of verification is a DIFFERENT untrusted channel, ideally over a VOICE CALL.")
+	fmt.Println()
 	fmt.Printf("Now you can encode/decode messages using 'seed session %s' command\n", name)
 }

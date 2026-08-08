@@ -4,7 +4,7 @@ Usage: seed <command>
 Available commands:
 • seed exchange       -  Start exchange process
 • seed session <peer> -  Start session with saved peer
-• seed export <peer>  -  Export saved peer to other device safely
+• seed export  <peer> -  Export saved peer to other device safely
 • seed import         -  Import peer from other device safely
 • seed generate       -  Generate peer locally
 

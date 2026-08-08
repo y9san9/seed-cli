@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/atotto/clipboard"
 	"github.com/fxamacker/cbor/v2"
+	"time"
 )
 
 // todo: check if received burn-reply without burn-request
@@ -70,7 +71,9 @@ func burnReplyAction(
 		fmt.Println()
 	}
 
-	fmt.Printf("Step 2. Ask %s to decrypt burn confirmation\n", input.peer)
+	fmt.Printf("Step 2. Send burn confirmation to %s\n", input.peer)
+	time.Sleep(5 * time.Second)
+
 	fmt.Println("Self-burning session started!")
 	input.burnKey = burnKey
 	return true, nil

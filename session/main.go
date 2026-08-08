@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"seed/signature"
 	"seed/storage"
 )
 
@@ -27,6 +28,12 @@ func Run(args []string) {
 
 	fmt.Printf("Session with %s has started.\n", input.peer)
 	fmt.Println()
+	fmt.Println("PUBLIC SIGNATURE:", signature.DisplayString(input.key), "(SHA-256)")
+	fmt.Println()
+	fmt.Println("If both parties see the same text here, it is GUARANTEED that no one can read messages other than you.")
+	fmt.Println("If keys were MODIFIED by someone in the middle, signature will differ.")
+	fmt.Println("Suggested method of verification is a DIFFERENT untrusted channel, ideally over a VOICE CALL.")
+	fmt.Println()
 	fmt.Println("TIPS:")
 	fmt.Println("• Messages will be decoded or encoded automatically.")
 	fmt.Println("• Use '\\' for newlines.")
@@ -43,7 +50,7 @@ func Run(args []string) {
 
 		ok, err := burnRequestAction(&input)
 		if err != nil {
-			fmt.Printf("Couldn't start burn session. %+w\n", err)
+			fmt.Printf("Couldn't start burn session. %+v\n", err)
 			continue
 		}
 		if ok {
@@ -52,7 +59,7 @@ func Run(args []string) {
 
 		err = editorAction(&input)
 		if err != nil {
-			fmt.Println("Couldn't use editor :(")
+			fmt.Println("Couldn't use editor :(", err)
 			continue
 		}
 
@@ -78,7 +85,7 @@ func Run(args []string) {
 		}
 		ok, err = decryptAction(&input)
 		if err != nil {
-			fmt.Println("Message is poorely formatted.")
+			fmt.Println("Message is poorely formatted.", err)
 			continue
 		}
 		if ok {
