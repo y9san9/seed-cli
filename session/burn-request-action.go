@@ -83,6 +83,6 @@ func burnRequestAction(input *inputState) (bool, error) {
 	}
 
 	fmt.Println("Self-burning session has started!")
-	input.burnKey = burnKey
+	input.burn.key = burnKey
 	return true, nil
 }

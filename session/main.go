@@ -2,20 +2,51 @@ package session
 
 import (
 	"bufio"
+	"context"
+	"crypto/rand"
 	"fmt"
+	"io"
 	"os"
+	"os/signal"
 	"seed/signature"
 	"seed/storage"
+	"syscall"
 )
 
 func Run(args []string) {
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+
+	doneChan := make(chan os.Signal, 1)
+	signal.Notify(doneChan, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		<-doneChan
+		cancel()
+	}()
+
+	RunInterruptible(ctx, args)
+}
+
+func RunInterruptible(
+	ctx context.Context,
+	args []string,
+) {
 	if len(args) < 3 {
 		fmt.Println("Usage: seed session <peer>")
 		fmt.Println("To check available peers, visit ~/.seed/peers")
 		return
 	}
-	var input inputState
+
+	input := &inputState{}
 	input.peer = args[2]
+
+	defer func() {
+		for _, path := range input.burn.deletePaths {
+			fmt.Println("Burning:", path)
+			_ = os.Remove(path)
+		}
+	}()
 
 	scanner := bufio.NewScanner(os.Stdin)
 	key, success := storage.LoadPeer(input.peer)
@@ -46,9 +77,13 @@ func Run(args []string) {
 	fmt.Println("Paste text in the text field below:")
 
 	for {
-		input.text = scanText(input.burnKey != nil, scanner)
+		var err error
+		input.text, err = scanText(ctx, input.burn.key != nil, scanner)
+		if err != nil {
+			return
+		}
 
-		ok, err := burnRequestAction(&input)
+		ok, err := burnRequestAction(input)
 		if err != nil {
 			fmt.Printf("Couldn't start burn session. %+v\n", err)
 			continue
@@ -57,7 +92,7 @@ func Run(args []string) {
 			continue
 		}
 
-		err = editorAction(&input)
+		err = editorAction(input)
 		if err != nil {
 			fmt.Println("Couldn't use editor :(", err)
 			continue
@@ -67,7 +102,7 @@ func Run(args []string) {
 			continue
 		}
 
-		ok, err = fileEncryptAction(&input)
+		ok, err = fileEncryptAction(input)
 		if err != nil {
 			fmt.Printf("Message is poorely formatted. %#v\n", err)
 			continue
@@ -75,7 +110,7 @@ func Run(args []string) {
 		if ok {
 			continue
 		}
-		ok, err = fileDecryptAction(&input)
+		ok, err = fileDecryptAction(input)
 		if err != nil {
 			fmt.Printf("Message is poorely formatted. %+v\n", err)
 			continue
@@ -83,7 +118,7 @@ func Run(args []string) {
 		if ok {
 			continue
 		}
-		ok, err = decryptAction(&input)
+		ok, err = decryptAction(input)
 		if err != nil {
 			fmt.Println("Message is poorely formatted.", err)
 			continue
@@ -91,7 +126,7 @@ func Run(args []string) {
 		if ok {
 			continue
 		}
-		err = encryptAction(&input)
+		err = encryptAction(input)
 		if err != nil {
 			fmt.Printf("Can't encrypt this message :( %+w\n", err)
 			continue
@@ -99,4 +134,44 @@ func Run(args []string) {
 	}
 
 	fmt.Println("Session finished, bye :D")
+}
+
+func writeGarbage(path string) error {
+	f, err := os.OpenFile(path, os.O_WRONLY, 0600)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	defer f.Close()
+
+	stat, err := f.Stat()
+	if err != nil {
+		return err
+	}
+
+	size := stat.Size()
+	if size == 0 {
+		return nil
+	}
+
+	data := make([]byte, size)
+	if _, err := io.ReadFull(rand.Reader, data); err != nil {
+		return err
+	}
+
+	n, err := f.Write(data)
+	if err != nil {
+		return err
+	}
+	if int64(n) != size {
+		return io.ErrShortBuffer
+	}
+
+	if err := f.Sync(); err != nil {
+		return err
+	}
+
+	return nil
 }

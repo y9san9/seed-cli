@@ -13,8 +13,8 @@ func encryptAction(
 	var payload []byte
 	var err error
 
-	if input.burnKey != nil {
-		payload, err = encrypt(input.burnKey, []byte(input.text))
+	if input.burn.key != nil {
+		payload, err = encrypt(input.burn.key, []byte(input.text))
 		if err != nil {
 			return err
 		}
@@ -25,7 +25,7 @@ func encryptAction(
 	message := message{
 		Version: 0,
 		Payload: payload,
-		Burn:    input.burnKey != nil,
+		Burn:    input.burn.key != nil,
 	}
 
 	cbor, err := cbor.Marshal(message)

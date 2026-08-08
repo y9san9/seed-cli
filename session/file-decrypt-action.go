@@ -46,17 +46,17 @@ func fileDecryptAction(
 	}
 
 	// set metadataBytes and reader
-	reader, metadataBytes, burn, err := readBurnFile(reader, metadataBytes, input.burnKey)
+	reader, metadataBytes, burn, err := readBurnFile(reader, metadataBytes, input.burn.key)
 	if err != nil {
 		return false, err
 	}
-	if burn && input.burnKey == nil {
+	if burn && input.burn.key == nil {
 		fmt.Println("File was sent during self-burning session. Keys were destroyed :D")
 		return true, nil
 	}
-	if !burn && input.burnKey != nil {
+	if !burn && input.burn.key != nil {
 		fmt.Printf("%s left self-burning session, leaving as well...\n", input.peer)
-		input.burnKey = nil
+		input.burn.key = nil
 	}
 
 	var metadata fileMetadata
@@ -66,6 +66,8 @@ func fileDecryptAction(
 	}
 	filename := transformFilename(metadata.Name)
 	absolutePath := path.Join(path.Dir(text), filename)
+
+	input.burn.deletePaths = append(input.burn.deletePaths, absolutePath)
 
 	content, err := io.ReadAll(reader)
 	if err != nil {

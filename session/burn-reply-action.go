@@ -10,7 +10,6 @@ import (
 	"time"
 )
 
-// todo: check if received burn-reply without burn-request
 func burnReplyAction(
 	input *inputState,
 	decrypted []byte,
@@ -75,6 +74,6 @@ func burnReplyAction(
 	time.Sleep(5 * time.Second)
 
 	fmt.Println("Self-burning session started!")
-	input.burnKey = burnKey
+	input.burn.key = burnKey
 	return true, nil
 }

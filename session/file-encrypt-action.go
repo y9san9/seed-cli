@@ -57,8 +57,8 @@ func fileEncryptAction(input *inputState) (bool, error) {
 		return false, err
 	}
 
-	if input.burnKey != nil {
-		encrypted, err := encrypt(input.burnKey, buffer.Bytes())
+	if input.burn.key != nil {
+		encrypted, err := encrypt(input.burn.key, buffer.Bytes())
 		if err != nil {
 			return false, err
 		}
@@ -91,6 +91,8 @@ func fileEncryptAction(input *inputState) (bool, error) {
 		path.Dir(text),
 		hashedFileName+".seed",
 	)
+
+	input.burn.deletePaths = append(input.burn.deletePaths, absolutePath)
 
 	if err := os.WriteFile(absolutePath, encrypted, 0600); err != nil {
 		return false, err

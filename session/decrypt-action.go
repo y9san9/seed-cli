@@ -35,17 +35,17 @@ func decryptAction(
 		return false, err
 	}
 
-	if message.Burn && input.burnKey == nil {
+	if message.Burn && input.burn.key == nil {
 		fmt.Println("Message was sent during self-burning session. Keys are destroyed :D")
 		return true, nil
 	}
-	if !message.Burn && input.burnKey != nil {
+	if !message.Burn && input.burn.key != nil {
 		fmt.Printf("%s left self-burning session, leaving as well...\n", input.peer)
-		input.burnKey = nil
+		input.burn.key = nil
 	}
 	var payload []byte
-	if input.burnKey != nil {
-		payload, err = decrypt(input.burnKey, message.Payload)
+	if input.burn.key != nil {
+		payload, err = decrypt(input.burn.key, message.Payload)
 		if err != nil {
 			return false, err
 		}
@@ -54,7 +54,7 @@ func decryptAction(
 	}
 
 	fmt.Print(input.peer)
-	if input.burnKey != nil {
+	if input.burn.key != nil {
 		fmt.Print(" (BURN)")
 	}
 	fmt.Println(":", string(payload))
